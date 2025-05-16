@@ -23,12 +23,12 @@ contract RoseNft is ERC721, Ownable{
 
     // keep track of the bird gen structure 
     struct Bird {
-        uint genes;
-        uint64 birthTime;
-        uint32 mumId;
-        uint32 dadId;
-        uint32 readyTime;
-        uint16 generation;
+        uint256 genes;
+        uint256 birthTime;
+        uint256 mumId;
+        uint256 dadId;
+        uint256 readyTime;
+        uint256 generation;
     }
 
     Bird[] public birdList;
@@ -50,6 +50,7 @@ contract RoseNft is ERC721, Ownable{
         owner = ownerOfBirdNft[_birdId];
     }
 
+    // This function creates the first generation of Bird Nft 
     function createBirdNftOrigin (uint256 _birdGenes) public onlyOwner returns (uint256) {
         if (currentNumOfBirdGenBreed > MAX_BIRD_GEN_BREED) {
             revert birdGenBreedExceeded();
@@ -63,18 +64,71 @@ contract RoseNft is ERC721, Ownable{
     function _createBirdNft (uint256 dadBirdId, uint256 mumBirdId, uint256 generation, uint256 genes, address owner) internal returns (uint256) {
          Bird memory _birdGen01 = Bird ({
             genes: genes,
-            birthTime: uint64(block.timestamp),
-            mumId: uint32(mumBirdId),
-            dadId: uint32(dadBirdId),
-            readyTime: uint32(block.timestamp),
-            generation: uint16(generation)
+            birthTime: uint256(block.timestamp),
+            mumId: uint256(mumBirdId),
+            dadId: uint256(dadBirdId),
+            readyTime: uint256(block.timestamp),
+            generation: uint256(generation)
         });
              birdList.push(_birdGen01);
 
             uint newBirdNftId = birdList.length-1;
+
             ownerOfBirdNft[newBirdNftId]= owner;
+
              _transfer(address(0), owner, newBirdNftId);
+
             emit Birth(owner, newBirdNftId, mumBirdId, dadBirdId, genes);
+
             return newBirdNftId;
     }   
+
+    // This function  It takes two parent DNA values and creates a new one  
+    // @param _dadDna dna value of the dad bird. 
+    // @param _mumDna dnd value of the mum bird.
+    function _getNewBirdDna(uint _dadNftDna, uint _mumNftDna) internal view returns(uint) {
+
+       
+        uint[8] memory geneArray;      //stores 8 parts of the new DNA (each part = 2 digits).
+
+        uint8 random = uint8(block.timestamp % 255);  // used for randomness in gene selection.
+
+        uint index = 7;
+
+        uint randomPos = uint(block.timestamp % 8);     //selects one gene slot to be randomly mutated.
+
+        for (uint i=1; i<=128; i=i*2){
+            if (index == randomPos){
+                uint newFeature = block.timestamp % 99;
+                if (newFeature < 11){
+                    geneArray[index] = 11;
+                }else{
+                    geneArray[index] = newFeature;
+                }
+            }else{
+                if (random & i != 0){
+                    geneArray[index] = _dadNftDna % 100;
+                }else{
+                    geneArray[index] = _mumNftDna % 100;
+                }
+            }
+
+            _dadNftDna = _dadNftDna / 100;
+            _mumNftDna = _mumNftDna / 100;
+
+            if (index > 0){
+                index--;
+            }
+        }
+
+        uint nftDna;
+        for (uint i=0; i<8; i++){
+            nftDna = nftDna + geneArray[i];
+            if (i != 7){
+                nftDna = nftDna * 100;
+            }
+        }
+        return nftDna;
+    }
+    
 }
