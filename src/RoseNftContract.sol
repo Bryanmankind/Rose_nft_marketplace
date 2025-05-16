@@ -1,14 +1,13 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.13;
+pragma solidity 0.8.24;
 
-contract Counter {
-    uint256 public number;
+import {IERC721Metadata} from "@openzeppelin/contracts/token/ERC721/extensions/IERC721Metadata.sol";
+import {IERC721Receiver} from "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
+import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 
-    function setNumber(uint256 newNumber) public {
-        number = newNumber;
-    }
+contract RoseNft is IERC721 {
 
-    function increment() public {
-        number++;
+    constructor () is IERC721 ("Birdnft", "Brd") {
+        
     }
 }
