@@ -15,12 +15,16 @@ contract RoseNft is ERC721, Ownable{
     uint256 public currentNumOfBirdGenBreed;
     uint256 cooldownTime = 1 days;
 
-    mapping(address => uint256) public userBirdIdBalance; 
-    mapping(uint256 => address) public ownerOfBirdNft; 
-    mapping(uint => address) public approvedBirdfTokenIdToSpender;    
-    mapping(address => mapping(address => bool)) private operatorApprovals;
+    mapping(address => uint256) public userBirdIdBalance;       // get users birdId balance
+    mapping(uint256 => address) public ownerOfBirdNft;          // get the owner of a birdId
+    mapping(uint => address) public approvedBirdfTokenIdToSpender;                  // approve spender of a birdId 
+    mapping(address => mapping(address => bool)) private operatorApprovals;         // 
 
     uint256 constant MAX_BIRD_GEN_BREED = 10;
+
+    bytes4 internal constant ERC721_RECEIVED = bytes4(
+        keccak256("onERC721Received(address,address,uint256,bytes)")
+    );
 
     error birdGenBreedExceeded();
     error tokenDoesNotExist();
@@ -54,36 +58,35 @@ contract RoseNft is ERC721, Ownable{
         owner = ownerOfBirdNft[_birdId];
     }
 
-    bytes4 internal constant ERC721_RECEIVED = bytes4(
-        keccak256("onERC721Received(address,address,uint256,bytes)")
-    );
-
-      function totalSupply() external view returns (uint256 total) {
+    function totalSupply() external view returns (uint256 total) {
         return birdList.length;
     }
 
     // Function allow user to transfer their tokens to another address 
-    function safeTransferFrom(address from, address to, uint256 tokenId, bytes calldata data) external override {
+   function safeTransferFrom(address from, address to, uint256 tokenId, bytes memory data) public override {
         if (to == address(0)) {
+            revert invalidAddress();
+        }
+        if (from == address(0)) {
             revert invalidAddress();
         }
 
         if (ownerOfBirdNft[tokenId] != from) {
             revert notTheOwner();
-        }else {
-        if ( approvedBirdfTokenIdToSpender[tokenId] != from) {
-            revert notTheOwner();
-           }
         }
 
+        if (msg.sender != from){
+            if (approvedBirdfTokenIdToSpender[tokenId] != msg.sender) {
+                revert notTheOwner();
+            }
+        }
+       
+
+        _transfer(from, to, tokenId);
+
         if (_isContract(to)) {
-
-             _transfer(from, to, tokenId);
-            bytes4 result = IERC721Receiver(to).onERC721Received(msg.sender, from, tokenId, data);
-
-            require(result == ERC721_RECEIVED);
-        }else{
-            _transfer(from, to, tokenId);
+        bytes4 result = IERC721Receiver(to).onERC721Received(msg.sender, from, tokenId, data);
+        require(result == ERC721_RECEIVED, "Receiver did not accept NFT");
         }
 
     }
