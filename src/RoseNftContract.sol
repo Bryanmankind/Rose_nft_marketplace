@@ -5,6 +5,7 @@ import {ERC721} from "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 import {Base64} from "@openzeppelin/contracts/utils/Base64.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {IERC721Receiver} from "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
 
 contract RoseNft is ERC721, Ownable{
 
@@ -17,9 +18,9 @@ contract RoseNft is ERC721, Ownable{
     mapping(address => uint256) public userBirdIdBalance; 
     mapping(uint256 => address) public ownerOfBirdNft; 
     mapping(uint => address) public approvedBirdfTokenIdToSpender;    
+    mapping(address => mapping(address => bool)) private operatorApprovals;
 
     uint256 constant MAX_BIRD_GEN_BREED = 10;
-
 
     error birdGenBreedExceeded();
     error tokenDoesNotExist();
@@ -53,23 +54,47 @@ contract RoseNft is ERC721, Ownable{
         owner = ownerOfBirdNft[_birdId];
     }
 
+    bytes4 internal constant ERC721_RECEIVED = bytes4(
+        keccak256("onERC721Received(address,address,uint256,bytes)")
+    );
+
+      function totalSupply() external view returns (uint256 total) {
+        return birdList.length;
+    }
+
     // Function allow user to transfer their tokens to another address 
-    function safeTransferFrom(address to, uint256 tokenId) external {
+    function safeTransferFrom(address from, address to, uint256 tokenId, bytes calldata data) external override {
         if (to == address(0)) {
             revert invalidAddress();
         }
 
-        if (ownerOfBirdNft[tokenId] != msg.sender) {
+        if (ownerOfBirdNft[tokenId] != from) {
             revert notTheOwner();
         }else {
-        if ( approvedBirdfTokenIdToSpender[tokenId] != to) {
+        if ( approvedBirdfTokenIdToSpender[tokenId] != from) {
             revert notTheOwner();
            }
         }
 
-        transferFrom( msg.sender, to , tokenId);
+        if (_isContract(to)) {
 
-        emit Transfer(msg.sender, to, tokenId);
+             _transfer(from, to, tokenId);
+            bytes4 result = IERC721Receiver(to).onERC721Received(msg.sender, from, tokenId, data);
+
+            require(result == ERC721_RECEIVED);
+        }else{
+            _transfer(from, to, tokenId);
+        }
+
+    }
+
+    function _isContract(address _to) internal view returns (bool) {
+        // wallets will not have any code but contract must have some code
+        uint32 size;
+        assembly {
+            size := extcodesize(_to)
+        }
+        return size > 0;
     }
 
     // This function approves a BirdToken to a address if not the owner. 
@@ -85,6 +110,16 @@ contract RoseNft is ERC721, Ownable{
         approvedBirdfTokenIdToSpender[tokenId] = to;
         
         emit Approval(msg.sender, to, tokenId);
+    }
+
+    
+    function setApprovalForAll(address operator, bool _approved) public override {
+        operatorApprovals[msg.sender][operator] = _approved;
+        emit ApprovalForAll(msg.sender, operator, _approved);
+    }
+
+    function isApprovedForAll(address owner, address operator) public view override returns (bool){
+        return operatorApprovals[owner][operator];
     }
 
     // This function gets the address approved for a token Id 
@@ -120,7 +155,7 @@ contract RoseNft is ERC721, Ownable{
 
             ownerOfBirdNft[newBirdNftId]= owner;
 
-            _safeMint(owner, newBirdNftId);
+           transferFrom(address(0), msg.sender, newBirdNftId);
 
             emit Birth(owner, newBirdNftId, mumBirdId, dadBirdId, genes);
 
