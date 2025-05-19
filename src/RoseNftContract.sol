@@ -15,7 +15,7 @@ contract RoseNft is ERC721, Ownable{
     uint256 cooldownTime = 1 days;
 
     mapping(address => uint256) public userBirdIdBalance; 
-    mapping(uint256 => address) public ownerOfBirdNft;
+    mapping(uint256 => address) public ownerOfBirdNft;      
 
     uint256 constant MAX_BIRD_GEN_BREED = 10;
 
@@ -23,6 +23,7 @@ contract RoseNft is ERC721, Ownable{
     error birdGenBreedExceeded();
     error tokenDoesNotExist();
     error notTheOwner();
+    error invalidAddress();
     error onlyAllowedOnceEvery24Hours();
 
     // keep track of the bird gen structure 
@@ -37,12 +38,10 @@ contract RoseNft is ERC721, Ownable{
 
     Bird[] public birdList;
 
-    event Birth(address owner, uint256 kittenId, uint256 mumId, uint256 dadId, uint256 genes);
+    event Birth(address owner, uint256 birdId, uint256 mumId, uint256 dadId, uint256 genes);
+    event Transfer(address from, address to, uint256 tokenId)
 
     constructor () ERC721 ("BirdNft", "Brd") Ownable(msg.sender){}
-
-    function mint () public returns (bool) {
-    }
 
     // This function returns the number of Bird Nft owned by an address
     function balanceOf(address _owner) public view override returns (uint256 balance) {
@@ -54,7 +53,25 @@ contract RoseNft is ERC721, Ownable{
         owner = ownerOfBirdNft[_birdId];
     }
 
+    // Function allow user to transfer their tokens to another address 
+
+    function safeTransferFrom(to, tokenId) public override returns (bool) {
+        if (to == address(0)) {
+            revert invalidAddress();
+        }
+
+        if (ownerOfBirdNft[tokenId] != msg.sender) {
+            revert notTheOwner();
+        }
+
+        safeTransferFrom(msg.sender, to, tokenId);
+
+        emit Transfer(msg.sender, to, tokenId);
+        return true;
+    };
+
     // This function creates the first generation of Bird Nft 
+    // @param _birdGenes the gene used for breeding new bird nfts
     function createBirdNftOrigin (uint256 _birdGenes) public onlyOwner returns (uint256) {
         if (currentNumOfBirdGenBreed > MAX_BIRD_GEN_BREED) {
             revert birdGenBreedExceeded();
@@ -65,6 +82,7 @@ contract RoseNft is ERC721, Ownable{
         return _createBirdNft (0, 0, 0, _birdGenes, msg.sender);
     }
 
+    // This function mints the nft and sends to the users 
     function _createBirdNft (uint256 dadBirdId, uint256 mumBirdId, uint256 generation, uint256 genes, address owner) internal returns (uint256) {
          Bird memory _birdGen01 = Bird ({
             genes: genes,
@@ -80,13 +98,14 @@ contract RoseNft is ERC721, Ownable{
 
             ownerOfBirdNft[newBirdNftId]= owner;
 
-             _transfer(address(0), owner, newBirdNftId);
+            _safeMint(owner, newBirdNftId);
 
             emit Birth(owner, newBirdNftId, mumBirdId, dadBirdId, genes);
 
             return newBirdNftId;
     }  
 
+    // This function returns the nft of a tokenId 
     function getBird(uint tokenId) public view returns(
         uint256 genes,
         uint256 birthTime,
@@ -104,6 +123,7 @@ contract RoseNft is ERC721, Ownable{
         owner = ownerOfBirdNft[tokenId];
     }
 
+    // This function breeds new BirdNft
      function breedNewBirdNft (uint256 dadBirdId, uint256 mumBirdId) public returns (uint256 newNftDna) {
         if (dadBirdId > birdList.length ){
             revert tokenDoesNotExist();
