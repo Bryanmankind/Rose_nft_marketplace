@@ -12,6 +12,7 @@ contract RoseNft is ERC721, Ownable{
     uint256 private _currentBirdId;
     uint256 public BirdId;
     uint256 public currentNumOfBirdGenBreed;
+    uint256 cooldownTime = 1 days;
 
     mapping(address => uint256) public userBirdIdBalance; 
     mapping(uint256 => address) public ownerOfBirdNft;
@@ -20,6 +21,9 @@ contract RoseNft is ERC721, Ownable{
 
 
     error birdGenBreedExceeded();
+    error tokenDoesNotExist();
+    error notTheOwner();
+    error onlyAllowedOnceEvery24Hours();
 
     // keep track of the bird gen structure 
     struct Bird {
@@ -81,7 +85,68 @@ contract RoseNft is ERC721, Ownable{
             emit Birth(owner, newBirdNftId, mumBirdId, dadBirdId, genes);
 
             return newBirdNftId;
-    }   
+    }  
+
+    function getBird(uint tokenId) public view returns(
+        uint256 genes,
+        uint256 birthTime,
+        uint256 mumId,
+        uint256 dadId,
+        uint256 generation,
+        address owner
+    ) {
+        Bird storage bird = birdList[tokenId];
+        genes = bird.genes;
+        birthTime = bird.birthTime;
+        mumId = uint(bird.mumId);
+        dadId = uint(bird.dadId);
+        generation = uint(bird.generation);
+        owner = ownerOfBirdNft[tokenId];
+    }
+
+     function breedNewBirdNft (uint256 dadBirdId, uint256 mumBirdId) public returns (uint256 newNftDna) {
+        if (dadBirdId > birdList.length ){
+            revert tokenDoesNotExist();
+        }
+
+        if (mumBirdId > birdList.length ){
+            revert tokenDoesNotExist();
+        }
+        
+        if (ownerOfBirdNft[dadBirdId] != msg.sender){
+            revert notTheOwner();
+        }
+
+        if (ownerOfBirdNft[mumBirdId] != msg.sender){
+            revert notTheOwner();
+        }
+
+        if ((birdList[dadBirdId].readyTime) >= uint32(block.timestamp)){
+            revert onlyAllowedOnceEvery24Hours();
+        }
+
+        if ((birdList[mumBirdId].readyTime) >= uint32(block.timestamp)){
+            revert onlyAllowedOnceEvery24Hours();
+        }
+
+        ( uint256 dadNftDna,,,,uint256 DadGeneration, ) = getBird(dadBirdId);
+        ( uint256 mumNftDna,,,,uint256 MumGeneration,) = getBird(mumBirdId);
+        newNftDna = _getNewBirdDna(dadNftDna, mumNftDna);
+        uint newGen = 0;
+        if (DadGeneration < MumGeneration){
+            newGen = MumGeneration + 1;
+            newGen /= 2;
+        } else if (DadGeneration > MumGeneration){
+            newGen = DadGeneration + 1;
+            newGen /= 2;
+        } else{
+            newGen = MumGeneration + 1;
+        }
+        birdList[dadBirdId].readyTime = uint32(block.timestamp+cooldownTime);
+        birdList[mumBirdId].readyTime = uint32(block.timestamp+cooldownTime);
+
+        _createBirdNft(mumNftDna, dadNftDna, newGen, newNftDna, msg.sender);
+    } 
 
     // This function  It takes two parent DNA values and creates a new one  
     // @param _dadDna dna value of the dad bird. 
