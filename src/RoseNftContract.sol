@@ -15,7 +15,8 @@ contract RoseNft is ERC721, Ownable{
     uint256 cooldownTime = 1 days;
 
     mapping(address => uint256) public userBirdIdBalance; 
-    mapping(uint256 => address) public ownerOfBirdNft;      
+    mapping(uint256 => address) public ownerOfBirdNft; 
+    mapping(uint => address) public approvedBirdfTokenIdToSpender;    
 
     uint256 constant MAX_BIRD_GEN_BREED = 10;
 
@@ -39,7 +40,6 @@ contract RoseNft is ERC721, Ownable{
     Bird[] public birdList;
 
     event Birth(address owner, uint256 birdId, uint256 mumId, uint256 dadId, uint256 genes);
-    event Transfer(address from, address to, uint256 tokenId)
 
     constructor () ERC721 ("BirdNft", "Brd") Ownable(msg.sender){}
 
@@ -54,21 +54,43 @@ contract RoseNft is ERC721, Ownable{
     }
 
     // Function allow user to transfer their tokens to another address 
-
-    function safeTransferFrom(to, tokenId) public override returns (bool) {
+    function safeTransferFrom(address to, uint256 tokenId) external {
         if (to == address(0)) {
             revert invalidAddress();
         }
 
         if (ownerOfBirdNft[tokenId] != msg.sender) {
             revert notTheOwner();
+        }else {
+        if ( approvedBirdfTokenIdToSpender[tokenId] != to) {
+            revert notTheOwner();
+           }
         }
 
-        safeTransferFrom(msg.sender, to, tokenId);
+        transferFrom( msg.sender, to , tokenId);
 
         emit Transfer(msg.sender, to, tokenId);
-        return true;
-    };
+    }
+
+    // This function approves a BirdToken to a address if not the owner. 
+    function approve(address to, uint256 tokenId) public override {
+        if (to ==  address(0)) {
+            revert invalidAddress(); 
+        }
+
+        if (ownerOfBirdNft[tokenId] != msg.sender) {
+            revert notTheOwner();
+        }
+
+        approvedBirdfTokenIdToSpender[tokenId] = to;
+        
+        emit Approval(msg.sender, to, tokenId);
+    }
+
+    // This function gets the address approved for a token Id 
+    function getApproved(uint256 tokenId) public view override returns (address operator) {
+        operator = approvedBirdfTokenIdToSpender[tokenId];
+    }
 
     // This function creates the first generation of Bird Nft 
     // @param _birdGenes the gene used for breeding new bird nfts
